@@ -1,4 +1,4 @@
-import jsPDF from "jsPDF";
+import jsPDF from "jspdf";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { ROBOTO_REGULAR } from "./fonts";
