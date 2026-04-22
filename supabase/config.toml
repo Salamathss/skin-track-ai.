@@ -1,0 +1,13 @@
+project_id = "zwubojavkgssoxcdhyeq"
+
+[functions.analyze-skin]
+verify_jwt = false
+
+[functions.scan-product]
+verify_jwt = false
+
+[functions.skin-chat]
+verify_jwt = false
+
+[functions.get-weather]
+verify_jwt = false
