@@ -1,4 +1,4 @@
-import jsPDF from "jsPDF";
+import { jsPDF } from "jspdf";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { ROBOTO_REGULAR } from "./fonts";
@@ -26,7 +26,7 @@ interface ReportParams {
 export async function generateSkinReport({ profileName, cityName, scans, language }: ReportParams) {
   const isRu = language === "ru";
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  
+
   // 1. FINAL BOSS FONT REGISTRATION (USING LOCAL BASE64)
   try {
     doc.addFileToVFS("Roboto-Regular.ttf", ROBOTO_REGULAR);
@@ -44,7 +44,7 @@ export async function generateSkinReport({ profileName, cityName, scans, languag
   doc.setFont("Roboto", "normal"); // Use Roboto for both RU and EN to be safe
   doc.setFontSize(18);
   doc.text("SkinTrack AI", margin, 20);
-  
+
   doc.setFontSize(10);
   doc.setTextColor(100);
   doc.text(isRu ? "Отчёт о состоянии кожи" : "Skin Condition Report", margin, 27);
@@ -72,9 +72,9 @@ export async function generateSkinReport({ profileName, cityName, scans, languag
   doc.setFontSize(12);
   doc.text(isRu ? "История замеров:" : "Measurements History:", margin, y);
   y += 10;
-  
+
   doc.setFontSize(9);
-  
+
   (scans || []).forEach((scan, index) => {
     if (y > pageH - 20) {
       doc.addPage();
@@ -84,14 +84,14 @@ export async function generateSkinReport({ profileName, cityName, scans, languag
     const date = scan.created_at ? new Date(scan.created_at).toLocaleDateString() : '---';
     const score = scan.overall_score || scan.score || 0;
     const type = scan.skin_type || '-';
-    
+
     // Explicit label logic to ensure we see WHAT is being rendered
     const labelDate = isRu ? "Дата" : "Date";
     const labelScore = isRu ? "Балл" : "Score";
     const labelType = isRu ? "Тип" : "Type";
 
     const line = `${index + 1}. ${labelDate}: ${date} | ${labelScore}: ${score} | ${labelType}: ${type}`;
-    
+
     doc.text(line, margin, y);
     y += 7;
   });
@@ -105,7 +105,7 @@ export async function generateSkinReport({ profileName, cityName, scans, languag
   doc.setDrawColor(180);
   doc.setLineWidth(0.3);
   doc.line(margin, y, pageW - margin, y);
-  
+
   doc.setFontSize(7.5);
   doc.setTextColor(120);
   doc.text(
