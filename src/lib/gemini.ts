@@ -15,7 +15,7 @@ export interface AnalysisResult {
   skincare_steps?: { step: string; category: string }[];
 }
 
-const MODELS_TO_TRY = ["gemini-pro", "gemini-1.0-pro"];
+const MODELS_TO_TRY = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro-vision"];
 
 export async function analyzeSkinDirectly(
   base64Image: string,
@@ -42,17 +42,22 @@ export async function analyzeSkinDirectly(
     ? "The user has NO active routine. You MUST generate a FULL comprehensive skincare plan (at least 4-5 steps: Cleanser, Treatment, Moisturizer, SPF). Use brands from the shelf if they fit these categories."
     : "The user already has a routine. Suggest only specific incremental additions or replacements based on the current skin condition.";
 
-  const systemPrompt = `Act as a Senior Clinical Dermatologist. Analyze this skin image.
+  const systemPrompt = `Act as a Strict, Objective Clinical Dermatologist. Analyze this skin image without politeness or flattery.
 ${langInstruction}
 ${shelfContext}
 ${routineInstruction}
 
-### KEY REQUIREMENT (CRITICAL):
+### SCORING RULES (CRITICAL):
+1. NO DEFAULT HIGH SCORES: Do not automatically give 85+. Be a strict critic. Evaluate on a true 1-100 scale looking for the smallest nuances (pores, shine, texture, slight redness).
+2. DYNAMIC CALCULATION: Even if the skin looks good, find nuances. A difference in lighting or a slight change in state MUST result in a 3-5 point fluctuation. Never give the exact same score twice unless the image is identical.
+3. FACT-BASED PENALTIES: Tie the 'overall_score' directly to the findings. For example, if you detect 'oily skin' or 'acne', the score MUST automatically drop to the 70-78 range (or lower if severe). Perfect skin is extremely rare (95+).
+
+### KEY REQUIREMENT:
 In 'skincare_steps', for each step's 'step' field, use the format "[Brand Name] [Product Type]" (e.g., "Vichy SPF 50" or "CeraVe Hydrating Cleanser"). Use the brands from the user's shelf provided above if they match the scan findings.
 
 ### RESPONSE FORMAT (STRICT JSON):
 {
-  "summary": { "type": "string", "overall_score": number, "primary_concern": "string" },
+  "summary": { "type": "string (e.g., Oily, Dry, Combination)", "overall_score": number, "primary_concern": "string" },
   "metrics": { "oiliness": number, "hydration": number, "sensitivity": number, "acne_severity": number },
   "detailed_findings": ["string"],
   "routine_adjustments": ["string"],
@@ -67,7 +72,7 @@ RETURN ONLY RAW JSON. No markdown.`;
         { inline_data: { mime_type: "image/jpeg", data: base64Image } }
       ]
     }],
-    generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
+    generationConfig: { temperature: 0.75, maxOutputTokens: 2048 }
   };
 
   for (const model of MODELS_TO_TRY) {

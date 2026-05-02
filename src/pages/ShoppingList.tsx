@@ -52,30 +52,46 @@ export default function ShoppingList() {
     setError(null);
 
     try {
-      // 1. Fetch Context Data
-      const [scanRes, shelfRes, factsRes, weatherRes] = await Promise.all([
-        supabase
-          .from("skin_scans")
+      // 1. Fetch Context Data - Safe queries with fallbacks
+      const [scanRes, weatherRes] = await Promise.all([
+        (supabase.from("skin_scans") as any)
           .select("*")
           .eq("profile_id", activeProfile.id)
           .order("created_at", { ascending: false })
           .limit(1),
-        supabase
-          .from("cosmetic_shelf")
-          .select("product_name, category")
-          .eq("user_id", user.id)
-          .eq("is_active", true),
-        supabase
-          .from("user_facts")
-          .select("*")
-          .eq("user_id", user.id),
-        supabase
-          .from("weather_logs")
+        (supabase.from("weather_logs") as any)
           .select("*")
           .eq("user_id", user.id)
+          .eq("profile_id", activeProfile.id)
           .order("created_at", { ascending: false })
           .limit(1)
       ]);
+
+      // Fetch shelf with fallback
+      let shelfRes = await (supabase.from("cosmetic_shelf") as any)
+        .select("product_name, category")
+        .eq("user_id", user.id)
+        .eq("profile_id", activeProfile.id)
+        .eq("is_active", true);
+        
+      if (shelfRes.error && shelfRes.error.code === "42703") {
+        shelfRes = await supabase.from("cosmetic_shelf")
+          .select("product_name, category")
+          .eq("user_id", user.id)
+          .eq("is_active", true);
+      }
+
+      // Fetch facts with fallback
+      let factsRes = await (supabase.from("user_facts") as any)
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("profile_id", activeProfile.id);
+        
+      if (factsRes.error && factsRes.error.code === "42703") {
+        factsRes = await supabase.from("user_facts")
+          .select("*")
+          .eq("user_id", user.id);
+      }
 
       const scan = scanRes.data?.[0] || null;
       const shelf = shelfRes.data || [];
