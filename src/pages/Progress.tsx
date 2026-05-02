@@ -40,7 +40,7 @@ export default function Progress() {
   useEffect(() => {
     // DIAGNOSTIC CHECK
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     console.log("%c [Supabase Config]", "color: #ff9900; font-weight: bold;", {
       urlLoaded: !!supabaseUrl,
       keyLoaded: !!supabaseKey,

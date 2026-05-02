@@ -336,8 +336,8 @@ export default function CosmeticShelf() {
   });
 
   const expiringProducts = products.filter((p) => {
-    const days = getDaysLeft(p.opened_at, p.shelf_life_months);
-    return days !== null && days <= 14 && days > 0;
+    const { daysLeft } = calculateExpiration(p.opened_at, p.shelf_life_months);
+    return daysLeft !== null && daysLeft <= 14 && daysLeft > 0;
   });
 
   const addTestProduct = async () => {

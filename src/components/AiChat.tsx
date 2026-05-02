@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect, useCallback, useLayoutEffect } from "react";
-import { MessageCircle, X, Send, Mic, MicOff, ImagePlus, Sparkles, Loader2, Trash2, Info, Pencil, Check, Plus, XCircle, RefreshCw, User } from "lucide-react";
+import { MessageCircle, X, Send, Mic, MicOff, ImagePlus, Sparkles, Loader2, Trash2, Info, Pencil, Check, Plus, XCircle, RefreshCw, User, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile, SubProfile } from "@/contexts/ProfileContext";
+import { usePremium } from "@/contexts/PremiumContext";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
 interface ChatMessage {
   id?: string;
@@ -46,7 +48,8 @@ function getGenderAvatar(gender: string | null) {
 
 export default function AiChat() {
   const { user, session } = useAuth();
-  const { profiles } = useProfile();
+  const { profiles, activeProfile, setActiveProfile } = useProfile();
+  const { isPremium, setShowPremiumModal } = usePremium();
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -64,10 +67,13 @@ export default function AiChat() {
   const [newFactValue, setNewFactValue] = useState("");
   const [addingFact, setAddingFact] = useState(false);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   // Profile lock state
   const [lockedProfileId, setLockedProfileId] = useState<string | null>(null);
   const [lockedProfile, setLockedProfile] = useState<SubProfile | null>(null);
+  const [chatSession, setChatSession] = useState<any>(null);
   const [showSettings, setShowSettings] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -147,6 +153,17 @@ export default function AiChat() {
     }
   }, [user, profiles]);
 
+  // Sync with activeProfile change and clear history to prevent memory bleed
+  useEffect(() => {
+    if (activeProfile?.id && activeProfile.id !== lockedProfileId) {
+      setLockedProfileId(activeProfile.id);
+      setLockedProfile(activeProfile);
+      setMessages([]); 
+      setChatSession(null); // Reset Gemini context
+      setError(null); // Clear error state on profile change
+    }
+  }, [activeProfile?.id]);
+
   // Resolve locked profile object when profiles or lockedProfileId change
   useEffect(() => {
     if (lockedProfileId && profiles.length > 0) {
@@ -166,37 +183,56 @@ export default function AiChat() {
 
   // Load facts
   const loadFacts = useCallback(async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from("user_facts")
+    if (!user || !lockedProfileId || lockedProfileId === "null" || lockedProfileId.length < 32) return;
+    let query = (supabase
+      .from("user_facts") as any)
       .select("*")
-      .eq("user_id", user.id);
-    if (data) setFacts(data as UserFact[]);
-  }, [user]);
+      .eq("user_id", user.id)
+      .eq("profile_id", lockedProfileId);
+    
+    const { data, error } = await query;
+    if (error && (error as any).code === "42703") {
+      const fallbackQuery = await supabase.from("user_facts").select("*").eq("user_id", user.id);
+      if (fallbackQuery.data) setFacts(fallbackQuery.data as UserFact[]);
+    } else if (data) {
+      setFacts(data as UserFact[]);
+    }
+  }, [user, lockedProfileId]);
 
   // Load chat history on open (only when profile is locked)
   useEffect(() => {
-    if (!open || !user || !lockedProfileId) return;
+    if (!open || !user || !lockedProfileId || lockedProfileId === "null" || lockedProfileId.length < 32) return;
     const loadHistory = async () => {
+      setMessages([]); // Clear state before loading new profile history
       setIsHistoryLoading(true);
+      setError(null);
+      
+      const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Timeout")), 10000)
+      );
+
       try {
-        const { data, error } = await supabase
-          .from("chat_messages")
+        const query = (supabase
+          .from("chat_messages") as any)
           .select("*")
           .eq("user_id", user.id)
+          .eq("profile_id", lockedProfileId)
           .order("created_at", { ascending: true })
-          .limit(20); // Limit to last 20 for context
+          .limit(20);
+
+        const { data, error: fetchError } = await Promise.race([query, timeout]) as any;
         
-        if (error) {
-          console.error("Error loading chat history:", error);
-          setMessages([]);
+        if (fetchError) {
+          console.error("Error loading chat history:", fetchError);
           return;
         }
-        
+
         if (data) setMessages(data as ChatMessage[]);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to fetch chat history:", err);
-        setMessages([]);
+        if (err.message === "Timeout") {
+          setError("Превышено время ожидания загрузки истории");
+        }
       } finally {
         setIsHistoryLoading(false);
       }
@@ -214,10 +250,12 @@ export default function AiChat() {
 
   // Lock a profile for the chat
   const lockProfile = (profile: SubProfile) => {
+    setActiveProfile(profile);
     setLockedProfileId(profile.id);
     setLockedProfile(profile);
     if (user) localStorage.setItem(`chat_locked_profile_${user.id}`, profile.id);
     setMessages([]);
+    setChatSession(null);
   };
 
   // Reset chat & unlock profile
@@ -287,12 +325,21 @@ export default function AiChat() {
     try {
       const factsToSave = JSON.parse(match[1]) as { key: string; value: string }[];
       for (const f of factsToSave) {
-        await supabase
+        const payload: any = { 
+          user_id: user!.id, 
+          profile_id: activeProfile?.id,
+          fact_key: f.key, 
+          fact_value: f.value, 
+          updated_at: new Date().toISOString() 
+        };
+        let { error } = await supabase
           .from("user_facts")
-          .upsert(
-            { user_id: user!.id, fact_key: f.key, fact_value: f.value, updated_at: new Date().toISOString() },
-            { onConflict: "user_id,fact_key" }
-          );
+          .upsert(payload, { onConflict: "user_id,fact_key" });
+          
+        if (error && (error as any).code === "42703") {
+          delete payload.profile_id;
+          await supabase.from("user_facts").upsert(payload, { onConflict: "user_id,fact_key" });
+        }
       }
       loadFacts();
     } catch (e) {
@@ -306,7 +353,17 @@ export default function AiChat() {
 
   // Send message
   const sendMessage = async () => {
-    if ((!input.trim() && !imageFile) || isLoading || !user || !lockedProfile) return;
+    // Emergency reset: if chat is stuck in loading state
+    if (isLoading || isHistoryLoading) {
+      console.warn("Chat stuck detected, forcing reset...");
+      setIsLoading(false);
+      setIsHistoryLoading(false);
+      setIsThinking(false);
+    }
+
+    if ((!input.trim() && !imageFile) || !user || !activeProfile || isSending) return;
+    const profileId = activeProfile.id;
+    setIsSending(true);
 
     if (!GEMINI_API_KEY) {
       toast.error("Gemini API key not found. Please check your .env file.");
@@ -330,12 +387,17 @@ export default function AiChat() {
     setIsLoading(true);
     setIsThinking(true);
 
-    const { error: insertError } = await supabase.from("chat_messages").insert({
+    let payload: any = {
       user_id: user.id,
       role: "user",
       content: userMsg.content,
       image_url: uploadedImageUrl,
-    });
+    };
+    if (activeProfile?.id) {
+      payload.profile_id = activeProfile.id;
+    }
+
+    const { error: insertError } = await (supabase.from("chat_messages") as any).insert(payload);
 
     if (insertError) {
       console.error("Error saving user message to database:", insertError);
@@ -344,17 +406,18 @@ export default function AiChat() {
     try {
       // Fetch context data (scans and products)
       const [scansRes, shelfRes] = await Promise.all([
-        supabase
-          .from("skin_scans")
+        (supabase
+          .from("skin_scans") as any)
           .select("score, skin_type, primary_concern, oiliness, hydration, sensitivity, acne_type, inflammation, detailed_findings, created_at")
           .eq("user_id", user.id)
-          .eq("profile_id", lockedProfile.id)
+          .eq("profile_id", activeProfile.id)
           .order("created_at", { ascending: false })
           .limit(5),
-        supabase
-          .from("cosmetic_shelf")
+        (supabase
+          .from("cosmetic_shelf") as any)
           .select("product_name, brand, category, active_ingredients, is_active")
           .eq("user_id", user.id)
+          .eq("profile_id", activeProfile.id)
           .eq("is_active", true)
       ]);
 
@@ -396,12 +459,9 @@ export default function AiChat() {
         parts: [{ text: `You are an AI Skincare Buddy. Be empathetic and professional.
 Language: ${i18n.language === "ru" ? "Russian" : "English"}.
 
-### USER PROFILE:
-- Name: ${lockedProfile.profile_name}
-- Gender: ${lockedProfile.gender || "Not set"}
+### USER CONTEXT:
+- Name: ${activeProfile.profile_name}
 - Age: ${facts.find(f => f.fact_key === "age")?.fact_value || "Unknown"}
-- Skin Type: ${recentScans[0]?.skin_type || "No scans yet"}
-- Primary Concern: ${recentScans[0]?.primary_concern || "None"}
 
 ### CONTEXT:
 ${contextInfo}
@@ -457,6 +517,9 @@ Common keys: age, skin_type, skin_goal, allergies, concerns.` }]
         }
       ];
 
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 10000);
+
       const resp = await fetch(PROXIED_GEMINI_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -465,9 +528,25 @@ Common keys: age, skin_type, skin_goal, allergies, concerns.` }]
           system_instruction: systemInstruction,
           generationConfig: { temperature: 0.7, maxOutputTokens: 1024 } 
         }),
+        signal: controller.signal
       });
+      clearTimeout(id);
 
-      if (!resp.ok) throw new Error("Gemini API call failed");
+      if (!resp.ok) {
+        const errorText = await resp.text().catch(() => "Unknown error");
+        console.error("Gemini API Detailed Error:", {
+          status: resp.status,
+          statusText: resp.statusText,
+          body: errorText,
+          url: PROXIED_GEMINI_URL
+        });
+        
+        if (resp.status === 429) {
+          throw new Error("Слишком много запросов. Пожалуйста, подождите 1 минуту.");
+        }
+        
+        throw new Error(`Gemini API call failed: ${resp.status}`);
+      }
 
       setIsThinking(false);
       const reader = resp.body?.getReader();
@@ -506,18 +585,23 @@ Common keys: age, skin_type, skin_goal, allergies, concerns.` }]
       if (assistantContent) {
         await parseSaveFacts(assistantContent);
         const displayContent = cleanContent(assistantContent);
-        const { error: assistantInsertError } = await supabase.from("chat_messages").insert({
+        let assistantPayload: any = {
           user_id: user.id,
           role: "assistant",
           content: displayContent,
-        });
+        };
+        if (activeProfile?.id) {
+          assistantPayload.profile_id = activeProfile.id;
+        }
+
+        const { error: assistantInsertError } = await (supabase.from("chat_messages") as any).insert(assistantPayload);
 
         if (assistantInsertError) {
           console.error("Error saving assistant message to database:", assistantInsertError);
         }
       }
     } catch (err: any) {
-      console.error("Chat error:", err);
+      console.error("FULL CHAT ERROR:", err);
       const errorMsg: ChatMessage = {
         role: "assistant",
         content: `⚠️ ${err.message || "Something went wrong. Please try again."}`,
@@ -527,6 +611,7 @@ Common keys: age, skin_type, skin_goal, allergies, concerns.` }]
     } finally {
       setIsLoading(false);
       setIsThinking(false);
+      setIsSending(false);
     }
   };
 
@@ -538,21 +623,30 @@ Common keys: age, skin_type, skin_goal, allergies, concerns.` }]
 
   // Fact management
   const saveFact = async (key: string, value: string) => {
-    if (!user || !key.trim() || !value.trim()) return;
-    await supabase
-      .from("user_facts")
-      .upsert(
-        { user_id: user.id, fact_key: key.trim(), fact_value: value.trim(), updated_at: new Date().toISOString() },
-        { onConflict: "user_id,fact_key" }
-      );
+    if (!user || !key.trim() || !value.trim() || !lockedProfileId) return;
+    const payload: any = { 
+      user_id: user.id, 
+      profile_id: activeProfile?.id,
+      fact_key: key.trim(), 
+      fact_value: value.trim(), 
+      updated_at: new Date().toISOString() 
+    };
+    
+    let { error } = await (supabase.from("user_facts") as any).upsert(payload, { onConflict: "user_id,fact_key" });
+    
+    if (error && (error as any).code === "42703") {
+      delete payload.profile_id;
+      await (supabase.from("user_facts") as any).upsert(payload, { onConflict: "user_id,fact_key" });
+    }
+    
     loadFacts();
     setEditingFact(null);
     setEditValue("");
   };
 
   const deleteFact = async (key: string) => {
-    if (!user) return;
-    await supabase.from("user_facts").delete().eq("user_id", user.id).eq("fact_key", key);
+    if (!user || !activeProfile?.id || activeProfile.id === "null") return;
+    await (supabase.from("user_facts") as any).delete().eq("user_id", user.id).eq("profile_id", activeProfile.id).eq("fact_key", key);
     loadFacts();
   };
 
@@ -592,21 +686,34 @@ Common keys: age, skin_type, skin_goal, allergies, concerns.` }]
       <h3 className="text-lg font-bold mb-1">{t("chat_selectProfile")}</h3>
       <p className="text-sm text-muted-foreground text-center mb-6">{t("chat_selectProfileDesc")}</p>
       <div className="w-full space-y-2">
-        {profiles.map((profile) => (
+        {profiles.map((profile) => {
+          const isPro = isPremium || activeProfile?.is_premium;
+          const isBlocked = !isPro && profile.id !== activeProfile?.id;
+          return (
           <button
             key={profile.id}
-            onClick={() => lockProfile(profile)}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all"
+            onClick={() => {
+              if (isBlocked) {
+                setShowPremiumModal(true);
+                return;
+              }
+              lockProfile(profile);
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${isBlocked ? "border-border opacity-60 bg-muted/30 cursor-not-allowed" : "border-border hover:border-primary/50 hover:bg-primary/5"}`}
           >
-            <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-xl">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${isBlocked ? "bg-muted/50 grayscale" : "bg-muted"}`}>
               {getGenderAvatar(profile.gender)}
             </div>
             <div className="text-left flex-1">
-              <p className="text-sm font-semibold">{profile.profile_name}</p>
+              <p className="text-sm font-semibold flex items-center gap-2">
+                {profile.profile_name}
+                {isBlocked && <Lock className="w-3.5 h-3.5 text-muted-foreground" />}
+              </p>
               <p className="text-[11px] text-muted-foreground capitalize">{profile.gender || t("chat_genderNotSet")}</p>
             </div>
           </button>
-        ))}
+        );
+      })}
       </div>
     </div>
   );
@@ -748,19 +855,17 @@ Common keys: age, skin_type, skin_goal, allergies, concerns.` }]
             <>
               {/* Messages */}
               <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-                {isHistoryLoading && (
-                  <div className="flex items-center justify-center gap-2 py-2 animate-pulse">
-                    <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
-                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{t("chat_loadingHistory") || "Syncing history..."}</span>
+                {isHistoryLoading ? (
+                  <div className="flex-1 flex flex-col items-center justify-center space-y-4 py-8">
+                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                    <p className="text-sm text-muted-foreground animate-pulse">{t("chat_loadingHistory")}</p>
                   </div>
-                )}
-
-                {messages.length === 0 && !isThinking && !isHistoryLoading && (
+                ) : messages.length === 0 ? (
                   <div className="text-center py-8">
                     <Sparkles className="w-10 h-10 text-primary/40 mx-auto mb-3" />
                     <p className="text-sm text-muted-foreground">{t("chat_welcome")}</p>
                   </div>
-                )}
+                ) : null}
 
                 {messages.map((msg, i) => (
                   <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -865,14 +970,17 @@ Common keys: age, skin_type, skin_goal, allergies, concerns.` }]
                       {listening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                     </button>
                   )}
-                  <Button
+                  <button
                     onClick={sendMessage}
-                    disabled={isLoading || (!input.trim() && !imageFile)}
-                    size="icon"
-                    className="rounded-xl flex-shrink-0 h-10 w-10"
+                    disabled={(!input.trim() && !imageFile) || isLoading || isSending || (isHistoryLoading && !error)}
+                    className={`p-3 rounded-xl transition-all ${
+                      (!input.trim() && !imageFile) || isLoading || (isHistoryLoading && !error)
+                        ? "bg-muted text-muted-foreground cursor-not-allowed"
+                        : "bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:scale-105 active:scale-95"
+                    }`}
                   >
                     <Send className="w-4 h-4" />
-                  </Button>
+                  </button>
                 </div>
               </div>
             </>
