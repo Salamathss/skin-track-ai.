@@ -183,13 +183,16 @@ export default function ShoppingList() {
     }
   };
 
-  const handleRegenerate = () => {
+  const handleRegenerate = async () => {
+    if (!user || !activeProfile) return;
     setGenerated(false);
     setItems([]);
     setError(null);
-    if (activeProfile?.id) {
+    if (activeProfile.id) {
       localStorage.removeItem(`${STORAGE_KEY}-${activeProfile.id}`);
     }
+    // Immediately trigger a new generation
+    await generateList();
   };
 
   const removeItem = (index: number) => {
