@@ -26,7 +26,7 @@ interface UserFact {
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
-const PROXIED_GEMINI_URL = `https://corsproxy.io/?${encodeURIComponent(GEMINI_URL)}`;
+const PROXIED_GEMINI_URL = GEMINI_URL;
 
 const FACT_LABELS: Record<string, { en: string; ru: string }> = {
   age: { en: "Age", ru: "Возраст" },
@@ -69,7 +69,7 @@ export default function AiChat() {
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Profile lock state
   const [lockedProfileId, setLockedProfileId] = useState<string | null>(null);
   const [lockedProfile, setLockedProfile] = useState<SubProfile | null>(null);
@@ -101,7 +101,7 @@ export default function AiChat() {
           setFabPos({ x, y });
           return;
         }
-      } catch {}
+      } catch { }
       setFabPos({ x: window.innerWidth - 80, y: window.innerHeight - 180 });
     }
   }, []);
@@ -158,7 +158,7 @@ export default function AiChat() {
     if (activeProfile?.id && activeProfile.id !== lockedProfileId) {
       setLockedProfileId(activeProfile.id);
       setLockedProfile(activeProfile);
-      setMessages([]); 
+      setMessages([]);
       setChatSession(null); // Reset Gemini context
       setError(null); // Clear error state on profile change
     }
@@ -189,7 +189,7 @@ export default function AiChat() {
       .select("*")
       .eq("user_id", user.id)
       .eq("profile_id", lockedProfileId);
-    
+
     const { data, error } = await query;
     if (error && (error as any).code === "42703") {
       const fallbackQuery = await supabase.from("user_facts").select("*").eq("user_id", user.id);
@@ -206,8 +206,8 @@ export default function AiChat() {
       setMessages([]); // Clear state before loading new profile history
       setIsHistoryLoading(true);
       setError(null);
-      
-      const timeout = new Promise((_, reject) => 
+
+      const timeout = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Timeout")), 10000)
       );
 
@@ -221,7 +221,7 @@ export default function AiChat() {
           .limit(20);
 
         const { data, error: fetchError } = await Promise.race([query, timeout]) as any;
-        
+
         if (fetchError) {
           console.error("Error loading chat history:", fetchError);
           return;
@@ -325,17 +325,17 @@ export default function AiChat() {
     try {
       const factsToSave = JSON.parse(match[1]) as { key: string; value: string }[];
       for (const f of factsToSave) {
-        const payload: any = { 
-          user_id: user!.id, 
+        const payload: any = {
+          user_id: user!.id,
           profile_id: activeProfile?.id,
-          fact_key: f.key, 
-          fact_value: f.value, 
-          updated_at: new Date().toISOString() 
+          fact_key: f.key,
+          fact_value: f.value,
+          updated_at: new Date().toISOString()
         };
         let { error } = await supabase
           .from("user_facts")
           .upsert(payload, { onConflict: "user_id,fact_key" });
-          
+
         if (error && (error as any).code === "42703") {
           delete payload.profile_id;
           await supabase.from("user_facts").upsert(payload, { onConflict: "user_id,fact_key" });
@@ -426,7 +426,7 @@ export default function AiChat() {
 
       // Build System Prompt (Simplified version of the Edge Function prompt)
       let contextInfo = `User Profile: ${lockedProfile.profile_name} (${lockedProfile.gender || "unknown"}).`;
-      
+
       if (facts.length > 0) {
         contextInfo += "\nKnown Facts: " + facts.map(f => `${f.fact_key}: ${f.fact_value}`).join(", ");
       }
@@ -456,7 +456,8 @@ export default function AiChat() {
       }
 
       const systemInstruction = {
-        parts: [{ text: `You are an AI Skincare Buddy. Be empathetic and professional.
+        parts: [{
+          text: `You are an AI Skincare Buddy. Be empathetic and professional.
 Language: ${i18n.language === "ru" ? "Russian" : "English"}.
 
 ### USER CONTEXT:
@@ -504,15 +505,19 @@ Common keys: age, skin_type, skin_goal, allergies, concerns.` }]
           role: "user",
           parts: [
             { text: userMsg.content },
-            ...(uploadedImageUrl ? [{ inline_data: { mime_type: "image/jpeg", data: await (async () => {
-              const resp = await fetch(uploadedImageUrl);
-              const blob = await resp.blob();
-              return new Promise<string>((resolve) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve((reader.result as string).split(",")[1]);
-                reader.readAsDataURL(blob);
-              });
-            })() }}] : [])
+            ...(uploadedImageUrl ? [{
+              inline_data: {
+                mime_type: "image/jpeg", data: await (async () => {
+                  const resp = await fetch(uploadedImageUrl);
+                  const blob = await resp.blob();
+                  return new Promise<string>((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve((reader.result as string).split(",")[1]);
+                    reader.readAsDataURL(blob);
+                  });
+                })()
+              }
+            }] : [])
           ]
         }
       ];
@@ -523,10 +528,10 @@ Common keys: age, skin_type, skin_goal, allergies, concerns.` }]
       const resp = await fetch(PROXIED_GEMINI_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          contents, 
+        body: JSON.stringify({
+          contents,
           system_instruction: systemInstruction,
-          generationConfig: { temperature: 0.7, maxOutputTokens: 1024 } 
+          generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
         }),
         signal: controller.signal
       });
@@ -540,11 +545,11 @@ Common keys: age, skin_type, skin_goal, allergies, concerns.` }]
           body: errorText,
           url: PROXIED_GEMINI_URL
         });
-        
+
         if (resp.status === 429) {
           throw new Error("Слишком много запросов. Пожалуйста, подождите 1 минуту.");
         }
-        
+
         throw new Error(`Gemini API call failed: ${resp.status}`);
       }
 
@@ -559,7 +564,7 @@ Common keys: age, skin_type, skin_goal, allergies, concerns.` }]
           if (done) break;
           const chunk = decoder.decode(value);
           const lines = chunk.split("\n");
-          
+
           for (const line of lines) {
             if (line.startsWith("data: ")) {
               try {
@@ -576,7 +581,7 @@ Common keys: age, skin_type, skin_goal, allergies, concerns.` }]
                     return [...prev, { role: "assistant", content: displayContent }];
                   });
                 }
-              } catch (e) {}
+              } catch (e) { }
             }
           }
         }
@@ -624,21 +629,21 @@ Common keys: age, skin_type, skin_goal, allergies, concerns.` }]
   // Fact management
   const saveFact = async (key: string, value: string) => {
     if (!user || !key.trim() || !value.trim() || !lockedProfileId) return;
-    const payload: any = { 
-      user_id: user.id, 
+    const payload: any = {
+      user_id: user.id,
       profile_id: activeProfile?.id,
-      fact_key: key.trim(), 
-      fact_value: value.trim(), 
-      updated_at: new Date().toISOString() 
+      fact_key: key.trim(),
+      fact_value: value.trim(),
+      updated_at: new Date().toISOString()
     };
-    
+
     let { error } = await (supabase.from("user_facts") as any).upsert(payload, { onConflict: "user_id,fact_key" });
-    
+
     if (error && (error as any).code === "42703") {
       delete payload.profile_id;
       await (supabase.from("user_facts") as any).upsert(payload, { onConflict: "user_id,fact_key" });
     }
-    
+
     loadFacts();
     setEditingFact(null);
     setEditValue("");
@@ -690,30 +695,30 @@ Common keys: age, skin_type, skin_goal, allergies, concerns.` }]
           const isPro = isPremium || activeProfile?.is_premium;
           const isBlocked = !isPro && profile.id !== activeProfile?.id;
           return (
-          <button
-            key={profile.id}
-            onClick={() => {
-              if (isBlocked) {
-                setShowPremiumModal(true);
-                return;
-              }
-              lockProfile(profile);
-            }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${isBlocked ? "border-border opacity-60 bg-muted/30 cursor-not-allowed" : "border-border hover:border-primary/50 hover:bg-primary/5"}`}
-          >
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${isBlocked ? "bg-muted/50 grayscale" : "bg-muted"}`}>
-              {getGenderAvatar(profile.gender)}
-            </div>
-            <div className="text-left flex-1">
-              <p className="text-sm font-semibold flex items-center gap-2">
-                {profile.profile_name}
-                {isBlocked && <Lock className="w-3.5 h-3.5 text-muted-foreground" />}
-              </p>
-              <p className="text-[11px] text-muted-foreground capitalize">{profile.gender || t("chat_genderNotSet")}</p>
-            </div>
-          </button>
-        );
-      })}
+            <button
+              key={profile.id}
+              onClick={() => {
+                if (isBlocked) {
+                  setShowPremiumModal(true);
+                  return;
+                }
+                lockProfile(profile);
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${isBlocked ? "border-border opacity-60 bg-muted/30 cursor-not-allowed" : "border-border hover:border-primary/50 hover:bg-primary/5"}`}
+            >
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${isBlocked ? "bg-muted/50 grayscale" : "bg-muted"}`}>
+                {getGenderAvatar(profile.gender)}
+              </div>
+              <div className="text-left flex-1">
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  {profile.profile_name}
+                  {isBlocked && <Lock className="w-3.5 h-3.5 text-muted-foreground" />}
+                </p>
+                <p className="text-[11px] text-muted-foreground capitalize">{profile.gender || t("chat_genderNotSet")}</p>
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -869,11 +874,10 @@ Common keys: age, skin_type, skin_goal, allergies, concerns.` }]
 
                 {messages.map((msg, i) => (
                   <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                      msg.role === "user"
+                    <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${msg.role === "user"
                         ? "gradient-primary text-primary-foreground rounded-br-md"
                         : "bg-muted/60 text-foreground rounded-bl-md"
-                    }`}>
+                      }`}>
                       {msg.image_url && (
                         <img src={msg.image_url} alt="" className="rounded-xl mb-2 max-h-40 object-cover" />
                       )}
@@ -973,11 +977,10 @@ Common keys: age, skin_type, skin_goal, allergies, concerns.` }]
                   <button
                     onClick={sendMessage}
                     disabled={(!input.trim() && !imageFile) || isLoading || isSending || (isHistoryLoading && !error)}
-                    className={`p-3 rounded-xl transition-all ${
-                      (!input.trim() && !imageFile) || isLoading || (isHistoryLoading && !error)
+                    className={`p-3 rounded-xl transition-all ${(!input.trim() && !imageFile) || isLoading || (isHistoryLoading && !error)
                         ? "bg-muted text-muted-foreground cursor-not-allowed"
                         : "bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:scale-105 active:scale-95"
-                    }`}
+                      }`}
                   >
                     <Send className="w-4 h-4" />
                   </button>
