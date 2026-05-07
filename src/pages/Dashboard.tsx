@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { Camera, TrendingUp, TrendingDown, Bell, ArrowRight, Loader2, Droplets, Sun, Zap, Package, Sparkles, CheckCircle2, AlertTriangle, GitCompareArrows, Plus } from "lucide-react";
+import { Camera, TrendingUp, TrendingDown, Bell, ArrowRight, Loader2, Droplets, Sun, Zap, Package, Sparkles, CheckCircle2, AlertTriangle, GitCompareArrows, Plus, Crown } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -224,7 +224,7 @@ export default function Dashboard() {
               <p className="text-sm text-muted-foreground font-medium">{activeProfile?.profile_name ?? "Profile"} 👋</p>
               {activeProfile?.is_premium && (
                 <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-black text-amber-500 uppercase tracking-widest">
-                  <Crown className="w-2.5 h-2.5 fill-amber-500" />
+                  {Crown && <Crown className="w-2.5 h-2.5 fill-amber-500" />}
                   Pro
                 </div>
               )}

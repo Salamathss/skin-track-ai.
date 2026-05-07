@@ -69,13 +69,13 @@ export default function AppNav() {
                 onClick={() => navigate("/subscription")}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:opacity-90 transition-opacity"
               >
-                <Crown className="w-3.5 h-3.5" />
+                {Crown && <Crown className="w-3.5 h-3.5" />}
                 Premium
               </button>
             )}
             {user && isPremium && (
               <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-amber-500 to-orange-500 text-white">
-                <Crown className="w-3.5 h-3.5" />
+                {Crown && <Crown className="w-3.5 h-3.5" />}
                 PRO
               </span>
             )}
@@ -134,13 +134,13 @@ export default function AppNav() {
                     onClick={() => { navigate("/subscription"); setMobileOpen(false); }}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold bg-gradient-to-r from-amber-500 to-orange-500 text-white w-full min-h-[44px] transition-opacity hover:opacity-90"
                   >
-                    <Crown className="w-5 h-5" />
+                    {Crown && <Crown className="w-5 h-5" />}
                     Premium
                   </button>
                 )}
                 {user && isPremium && (
                   <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold bg-gradient-to-r from-amber-500 to-orange-500 text-white min-h-[44px]">
-                    <Crown className="w-5 h-5" />
+                    {Crown && <Crown className="w-5 h-5" />}
                     PRO
                   </div>
                 )}

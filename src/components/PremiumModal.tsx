@@ -37,7 +37,7 @@ export default function PremiumModal() {
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-xl">
-                <Crown className="w-5 h-5 text-primary" />
+                {Crown && <Crown className="w-5 h-5 text-primary" />}
                 {isRu ? "Premium Plan" : "Premium Plan"}
               </DialogTitle>
               <DialogDescription>

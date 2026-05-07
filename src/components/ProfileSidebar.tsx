@@ -70,7 +70,7 @@ export default function ProfileSidebar() {
                       </p>
                       {profile?.is_premium && (
                         <div className="flex-shrink-0 bg-amber-500/10 text-amber-500 rounded px-1 py-0.5 animate-pulse">
-                          <Crown className="w-2.5 h-2.5 fill-current" />
+                          {Crown && <Crown className="w-2.5 h-2.5 fill-current" />}
                         </div>
                       )}
                     </div>
@@ -144,7 +144,7 @@ export default function ProfileSidebar() {
             >
               <span className="text-base">{getGenderAvatar(profile)}</span>
               <span className="max-w-[70px] truncate">{profile.profile_name}</span>
-              {profile?.is_premium && <Crown className="w-3 h-3 fill-amber-500 text-amber-500" />}
+              {profile?.is_premium && Crown && <Crown className="w-3 h-3 fill-amber-500 text-amber-500" />}
             </button>
           );
         })}

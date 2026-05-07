@@ -97,7 +97,7 @@ export default function Subscription() {
         <div className="max-w-md w-full text-center space-y-6 animate-scale-in">
           <div className="relative inline-block">
             <div className="w-24 h-24 rounded-full bg-amber-500/20 flex items-center justify-center mx-auto ring-2 ring-amber-500/50 shadow-[0_0_30px_rgba(245,158,11,0.4)]">
-              <Crown className="w-12 h-12 text-amber-500 fill-amber-500/20" />
+              {Crown && <Crown className="w-12 h-12 text-amber-500 fill-amber-500/20" />}
             </div>
             <Sparkles className="absolute -top-2 -right-2 w-8 h-8 text-amber-400 animate-pulse" />
           </div>
@@ -139,7 +139,7 @@ export default function Subscription() {
               <div className="absolute inset-0 rounded-full border-t-2 border-amber-500 animate-spin" />
               <div className="absolute inset-2 rounded-full border-b-2 border-indigo-500 animate-spin-slow" />
               <div className="absolute inset-0 flex items-center justify-center">
-                <Crown className="w-8 h-8 text-amber-500 animate-pulse" />
+                {Crown && <Crown className="w-8 h-8 text-amber-500 animate-pulse" />}
               </div>
             </div>
             <div className="space-y-3">
@@ -195,7 +195,7 @@ export default function Subscription() {
               {plan.highlight && (
                 <>
                   <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-400 to-amber-600 text-black px-6 py-1.5 rounded-bl-[1.5rem] text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg z-20">
-                    <Crown className="w-3 h-3" />
+                    {Crown && <Crown className="w-3 h-3" />}
                     PRO
                   </div>
                   <div className="absolute top-8 right-0 bg-white/10 backdrop-blur-md text-white px-4 py-1 rounded-l-full text-[9px] font-bold uppercase tracking-[0.15em] border-l border-t border-b border-white/20 z-10">
@@ -265,7 +265,7 @@ export default function Subscription() {
           <div className="flex items-center justify-center gap-6 opacity-30 grayscale invert">
             <ShieldCheck className="w-8 h-8" />
             <Heart className="w-8 h-8" />
-            <Crown className="w-8 h-8" />
+            {Crown && <Crown className="w-8 h-8" />}
           </div>
           <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] max-w-md mx-auto leading-relaxed">
             {t("sub_secure_payment_info")}
