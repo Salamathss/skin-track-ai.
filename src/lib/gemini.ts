@@ -25,7 +25,7 @@ export async function analyzeSkinDirectly(
   isRoutineEmpty: boolean = false
 ): Promise<AnalysisResult> {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_GOOGLE_API_KEY;
-  
+
   if (!apiKey) {
     console.error("CRITICAL: Gemini API Key is missing!");
     return getDummyAnalysis(language);
@@ -35,7 +35,7 @@ export async function analyzeSkinDirectly(
     ? "Return ALL text values in Russian. Table/Step names in skincare_steps should remain in English but use specific brand names if available."
     : "Respond in English. Use specific brand names in skincare_steps if available.";
 
-  const shelfContext = shelfProducts.length > 0 
+  const shelfContext = shelfProducts.length > 0
     ? `The user has these products on their shelf: ${shelfProducts.map(p => `${p.brand || ''} ${p.product_name} (${p.category})`).join(", ")}.`
     : "The user's shelf is empty.";
 
@@ -79,7 +79,9 @@ In 'skincare_steps', for each step's 'step' field, use the format "[Brand Name] 
   "skincare_steps": [{ "step": "string", "category": "Morning | Evening | Both" }]
 }
 
-BE BRUTALLY HONEST. If the skin looks 0.1% worse than a perfect model, the score must drop. Politeness is a failure; accuracy is a success.
+BE BRUTALLY HONEST. If the skin looks 0.1% worse than a perfect model, the score must drop. Politeness is a failure; accuracy is a success.CRITICAL: I repeat, NEVER return an overall_score of exactly 85 or 85.00. 
+If you calculate something close to 85, you MUST adjust it by at least 0.01 based on a micro-detail. 
+Your response will be REJECTED if the score is an integer.
 RETURN ONLY RAW JSON. No markdown.`;
 
   const payload = {
@@ -89,13 +91,13 @@ RETURN ONLY RAW JSON. No markdown.`;
         { inline_data: { mime_type: "image/jpeg", data: base64Image } }
       ]
     }],
-    generationConfig: { temperature: 0.75, maxOutputTokens: 2048 }
+    generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
   };
 
   for (const model of MODELS_TO_TRY) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`;
-      
+
       console.log(`%c FINAL ATTEMPT (Analysis) with model: ${model}`, "color: #00ff00; font-weight: bold;");
 
       const response = await fetch(url, {
@@ -135,7 +137,7 @@ function getDummyAnalysis(lang: string): AnalysisResult {
       sensitivity: 10,
       acne_severity: 0
     },
-    detailed_findings: isRu 
+    detailed_findings: isRu
       ? ["Кожа выглядит здоровой и чистой", "Хороший уровень увлажненности", "Заметных дефектов не обнаружено"]
       : ["Skin looks healthy and clear", "Good hydration levels detected", "No significant blemishes found"],
     routine_adjustments: isRu
