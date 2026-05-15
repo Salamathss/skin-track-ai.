@@ -233,7 +233,7 @@ export default function Progress() {
                       <Minus className="w-4 h-4 text-muted-foreground" />
                     )}
                     <span className={scoreDiff < 0 ? "text-severity-low" : scoreDiff > 0 ? "text-severity-high" : "text-muted-foreground"}>
-                      {scoreDiff > 0 ? "+" : ""}{scoreDiff}
+                      {scoreDiff > 0 ? "+" : ""}{scoreDiff.toFixed(2)}
                     </span>
                   </div>
                 )}
@@ -375,7 +375,7 @@ function ScanSelector({
           <option value="" disabled>Select scan…</option>
           {scans.map((s) => (
             <option key={s.id} value={s.id}>
-              {format(new Date(s.created_at), "MMM d, yyyy")} — {s.score ?? "—"} pts
+              {format(new Date(s.created_at), "MMM d, yyyy")} — {typeof s.score === 'number' ? s.score.toFixed(2) : "—"} pts
             </option>
           ))}
         </select>
@@ -388,7 +388,7 @@ function ScanSelector({
 function ScoreChip({ label, score, date }: { label: string; score: number | null; date: string }) {
   return (
     <div className="text-center">
-      <p className="text-2xl font-bold">{score ?? "—"}</p>
+      <p className="text-xl font-bold">{typeof score === 'number' ? score.toFixed(2) : "—"}</p>
       <p className="text-[10px] text-muted-foreground">{format(new Date(date), "MMM d, yyyy")}</p>
     </div>
   );

@@ -3,6 +3,7 @@ export interface AnalysisResult {
     type: string;
     overall_score: number;
     primary_concern: string;
+    justification?: string;
   };
   metrics: {
     oiliness: number;
@@ -23,7 +24,7 @@ export async function analyzeSkinDirectly(
   shelfProducts: any[] = [],
   isRoutineEmpty: boolean = false
 ): Promise<AnalysisResult> {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_GOOGLE_API_KEY;
   
   if (!apiKey) {
     console.error("CRITICAL: Gemini API Key is missing!");
@@ -42,27 +43,43 @@ export async function analyzeSkinDirectly(
     ? "The user has NO active routine. You MUST generate a FULL comprehensive skincare plan (at least 4-5 steps: Cleanser, Treatment, Moisturizer, SPF). Use brands from the shelf if they fit these categories."
     : "The user already has a routine. Suggest only specific incremental additions or replacements based on the current skin condition.";
 
-  const systemPrompt = `Act as a Strict, Objective Clinical Dermatologist. Analyze this skin image without politeness or flattery.
+  const systemPrompt = `Act as a Strict, Objective Clinical Dermatologist. Your goal is to provide a high-precision skin health score on a scale from 0.00 to 100.00.
+
+### SCORING PROTOCOL:
+1. NO ROUND NUMBERS: Never return scores like "85.00" or "90.00". Always use specific floats based on visual evidence (e.g., 84.37, 71.12).
+2. THE "PERFECTION" BARRIER: A score of 100.00 is impossible for human skin. Even the healthiest skin has micro-texture or pores. Start your evaluation from a baseline and deduct points for every imperfection.
+3. MICRO-DETECTION: 
+   - Deduct 0.05 - 0.50 points for slight redness or uneven skin tone.
+   - Deduct 1.00 - 5.00 points for active acne, inflammation, or significant congestion.
+   - Deduct 0.10 - 1.00 points for visible enlarged pores or dehydration lines.
+
+### ANALYSIS CATEGORIES (Each contributes to the final 100 score):
+- Clarity (33.3 pts): Absence of spots, acne, and blemishes.
+- Texture (33.3 pts): Smoothness and pore visibility.
+- Tone (33.4 pts): Evenness and absence of hyperpigmentation/redness.
+
 ${langInstruction}
 ${shelfContext}
 ${routineInstruction}
-
-### SCORING RULES (CRITICAL):
-1. NO DEFAULT HIGH SCORES: Do not automatically give 85+. Be a strict critic. Evaluate on a true 1-100 scale looking for the smallest nuances (pores, shine, texture, slight redness).
-2. DYNAMIC CALCULATION: Even if the skin looks good, find nuances. A difference in lighting or a slight change in state MUST result in a 3-5 point fluctuation. Never give the exact same score twice unless the image is identical.
-3. FACT-BASED PENALTIES: Tie the 'overall_score' directly to the findings. For example, if you detect 'oily skin' or 'acne', the score MUST automatically drop to the 70-78 range (or lower if severe). Perfect skin is extremely rare (95+).
 
 ### KEY REQUIREMENT:
 In 'skincare_steps', for each step's 'step' field, use the format "[Brand Name] [Product Type]" (e.g., "Vichy SPF 50" or "CeraVe Hydrating Cleanser"). Use the brands from the user's shelf provided above if they match the scan findings.
 
 ### RESPONSE FORMAT (STRICT JSON):
 {
-  "summary": { "type": "string (e.g., Oily, Dry, Combination)", "overall_score": number, "primary_concern": "string" },
+  "summary": { 
+    "type": "string", 
+    "overall_score": float (e.g. 84.37), 
+    "primary_concern": "string",
+    "justification": "Detailed Clinical Variance Report: Explain why you deducted even the smallest fraction of a point. Be specific about the areas of the face visible in the image."
+  },
   "metrics": { "oiliness": number, "hydration": number, "sensitivity": number, "acne_severity": number },
   "detailed_findings": ["string"],
   "routine_adjustments": ["string"],
   "skincare_steps": [{ "step": "string", "category": "Morning | Evening | Both" }]
 }
+
+BE BRUTALLY HONEST. If the skin looks 0.1% worse than a perfect model, the score must drop. Politeness is a failure; accuracy is a success.
 RETURN ONLY RAW JSON. No markdown.`;
 
   const payload = {

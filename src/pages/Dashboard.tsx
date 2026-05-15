@@ -265,7 +265,7 @@ export default function Dashboard() {
                     <circle cx="60" cy="60" r="52" fill="none" stroke="hsl(var(--primary))" strokeWidth="10" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} style={{ transition: "stroke-dashoffset 1s ease" }} />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-3xl font-bold">{currentScore}</span>
+                    <span className="text-2xl font-bold">{typeof currentScore === 'number' ? currentScore.toFixed(2) : currentScore}</span>
                     <span className="text-[10px] text-muted-foreground">/ 100</span>
                   </div>
                 </div>
@@ -274,7 +274,7 @@ export default function Dashboard() {
                   {change !== 0 && (
                     <div className="flex items-center gap-1 mt-1">
                       {change < 0 ? <TrendingDown className="w-4 h-4 text-severity-low" /> : <TrendingUp className="w-4 h-4 text-severity-high" />}
-                      <span className={`text-sm font-semibold ${change < 0 ? "text-severity-low" : "text-severity-high"}`}>{change > 0 ? "+" : ""}{change} pts</span>
+                      <span className={`text-sm font-semibold ${change < 0 ? "text-severity-low" : "text-severity-high"}`}>{change > 0 ? "+" : ""}{change.toFixed(2)} pts</span>
                     </div>
                   )}
                   {/* Mini metrics */}

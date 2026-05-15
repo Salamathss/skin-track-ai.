@@ -70,8 +70,8 @@ export default function PhotoUpload() {
           .eq("profile_id", activeProfile.id)
           .eq("is_completed", false);
           
-        let shelfQuery = supabase
-          .from("cosmetic_shelf")
+        let shelfQuery = (supabase
+          .from("cosmetic_shelf") as any)
           .select("product_name, brand, category, active_ingredients")
           .eq("profile_id", activeProfile.id)
           .eq("is_active", true);
@@ -118,11 +118,11 @@ export default function PhotoUpload() {
             user_id: user?.id || null,
             profile_id: activeProfile?.id || null,
             photo_url: path,
-            score: analysis.summary?.overall_score ?? analysis.score ?? 0,
-            inflammation: analysis.metrics ? `${analysis.metrics.sensitivity}` : (analysis.inflammation ?? null),
-            acne_type: analysis.summary?.type ?? (analysis.acne_type ?? null),
-            zones: analysis.detailed_findings ?? (analysis.zones ?? null),
-            recommendation: analysis.routine_adjustments?.join(" | ") ?? (analysis.recommendation ?? null),
+            score: analysis.summary?.overall_score ?? 0,
+            inflammation: analysis.metrics ? `${analysis.metrics.sensitivity}` : null,
+            acne_type: analysis.summary?.type ?? null,
+            zones: analysis.detailed_findings ?? null,
+            recommendation: analysis.routine_adjustments?.join(" | ") ?? null,
             oiliness: analysis.metrics?.oiliness ?? null,
             hydration: analysis.metrics?.hydration ?? null,
             sensitivity: analysis.metrics?.sensitivity ?? null,
@@ -140,7 +140,7 @@ export default function PhotoUpload() {
             // AUTOMATION: Save insights to user_facts for the current profile
             if (user && activeProfile) {
               const factsToUpsert = [];
-              const type = analysis.summary?.type || analysis.acne_type;
+              const type = analysis.summary?.type;
               if (type) {
                 factsToUpsert.push({
                   user_id: user.id,
@@ -379,19 +379,31 @@ export default function PhotoUpload() {
                     <circle cx="60" cy="60" r="50" fill="none" stroke="hsl(var(--primary))" strokeWidth="12" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} style={{ transition: "stroke-dashoffset 1s ease" }} />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-2xl font-bold">{score}</span>
-                    <span className="text-xs text-muted-foreground">/ 100</span>
+                    <span className="text-xl font-bold">{typeof score === 'number' ? score.toFixed(2) : score}</span>
+                    <span className="text-[10px] text-muted-foreground">/ 100</span>
                   </div>
                 </div>
-                <div>
+                <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <CheckCircle2 className="w-5 h-5 text-severity-low" />
-                    <span className="font-semibold text-severity-low">{t("scan_complete")}</span>
+                    <Shield className="w-4 h-4 text-primary" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-primary">Clinical Grade Analysis</span>
                   </div>
                   <p className="text-xl font-bold">{result.summary?.type || "Skin Analysis"}</p>
-                  <p className="text-sm text-muted-foreground mt-1">{result.summary?.primary_concern || "Processing findings..."}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">{result.summary?.primary_concern || "Processing findings..."}</p>
                 </div>
               </div>
+
+              {result.summary?.justification && (
+                <div className="mt-4 pt-4 border-t border-border/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Activity className="w-3.5 h-3.5 text-primary" />
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Clinical Variance Report</p>
+                  </div>
+                  <p className="text-sm text-foreground/80 leading-relaxed italic bg-muted/30 p-3 rounded-xl border border-border/20">
+                    {result.summary.justification}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Metrics */}
