@@ -81,17 +81,9 @@ export default function ShoppingList() {
           .eq("is_active", true);
       }
 
-      // Fetch facts with fallback
-      let factsRes = await (supabase.from("user_facts") as any)
+      let factsRes = await supabase.from("user_facts")
         .select("*")
-        .eq("user_id", user.id)
-        .eq("profile_id", activeProfile.id);
-        
-      if (factsRes.error && factsRes.error.code === "42703") {
-        factsRes = await supabase.from("user_facts")
-          .select("*")
-          .eq("user_id", user.id);
-      }
+        .eq("user_id", user.id);
 
       const scan = scanRes.data?.[0] || null;
       const shelf = shelfRes.data || [];

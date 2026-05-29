@@ -184,17 +184,12 @@ export default function AiChat() {
   // Load facts
   const loadFacts = useCallback(async () => {
     if (!user || !lockedProfileId || lockedProfileId === "null" || lockedProfileId.length < 32) return;
-    let query = (supabase
-      .from("user_facts") as any)
+    const { data, error } = await supabase
+      .from("user_facts")
       .select("*")
-      .eq("user_id", user.id)
-      .eq("profile_id", lockedProfileId);
+      .eq("user_id", user.id);
 
-    const { data, error } = await query;
-    if (error && (error as any).code === "42703") {
-      const fallbackQuery = await supabase.from("user_facts").select("*").eq("user_id", user.id);
-      if (fallbackQuery.data) setFacts(fallbackQuery.data as UserFact[]);
-    } else if (data) {
+    if (data) {
       setFacts(data as UserFact[]);
     }
   }, [user, lockedProfileId]);
@@ -327,19 +322,13 @@ export default function AiChat() {
       for (const f of factsToSave) {
         const payload: any = {
           user_id: user!.id,
-          profile_id: activeProfile?.id,
           fact_key: f.key,
           fact_value: f.value,
           updated_at: new Date().toISOString()
         };
-        let { error } = await supabase
+        await supabase
           .from("user_facts")
           .upsert(payload, { onConflict: "user_id,fact_key" });
-
-        if (error && (error as any).code === "42703") {
-          delete payload.profile_id;
-          await supabase.from("user_facts").upsert(payload, { onConflict: "user_id,fact_key" });
-        }
       }
       loadFacts();
     } catch (e) {
@@ -631,18 +620,12 @@ Common keys: age, skin_type, skin_goal, allergies, concerns.` }]
     if (!user || !key.trim() || !value.trim() || !lockedProfileId) return;
     const payload: any = {
       user_id: user.id,
-      profile_id: activeProfile?.id,
       fact_key: key.trim(),
       fact_value: value.trim(),
       updated_at: new Date().toISOString()
     };
 
-    let { error } = await (supabase.from("user_facts") as any).upsert(payload, { onConflict: "user_id,fact_key" });
-
-    if (error && (error as any).code === "42703") {
-      delete payload.profile_id;
-      await (supabase.from("user_facts") as any).upsert(payload, { onConflict: "user_id,fact_key" });
-    }
+    await supabase.from("user_facts").upsert(payload, { onConflict: "user_id,fact_key" });
 
     loadFacts();
     setEditingFact(null);
@@ -651,7 +634,7 @@ Common keys: age, skin_type, skin_goal, allergies, concerns.` }]
 
   const deleteFact = async (key: string) => {
     if (!user || !activeProfile?.id || activeProfile.id === "null") return;
-    await (supabase.from("user_facts") as any).delete().eq("user_id", user.id).eq("profile_id", activeProfile.id).eq("fact_key", key);
+    await supabase.from("user_facts").delete().eq("user_id", user.id).eq("fact_key", key);
     loadFacts();
   };
 

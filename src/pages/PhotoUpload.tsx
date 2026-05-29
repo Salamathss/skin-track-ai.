@@ -144,7 +144,6 @@ export default function PhotoUpload() {
               if (type) {
                 factsToUpsert.push({
                   user_id: user.id,
-                  profile_id: activeProfile.id,
                   fact_key: "skin_type",
                   fact_value: type,
                   updated_at: new Date().toISOString()
@@ -155,7 +154,6 @@ export default function PhotoUpload() {
               if (concern) {
                 factsToUpsert.push({
                   user_id: user.id,
-                  profile_id: activeProfile.id,
                   fact_key: "concerns",
                   fact_value: concern,
                   updated_at: new Date().toISOString()
@@ -163,16 +161,7 @@ export default function PhotoUpload() {
               }
               
               if (factsToUpsert.length > 0) {
-                let { error: factsErr } = await (supabase.from("user_facts") as any).upsert(factsToUpsert, { onConflict: "user_id,fact_key" });
-                // Fallback for older schemas
-                if (factsErr && (factsErr as any).code === "42703") {
-                  const legacyFacts = factsToUpsert.map(f => {
-                    const copy: any = { ...f };
-                    delete copy.profile_id;
-                    return copy;
-                  });
-                  await (supabase.from("user_facts") as any).upsert(legacyFacts, { onConflict: "user_id,fact_key" });
-                }
+                await supabase.from("user_facts").upsert(factsToUpsert, { onConflict: "user_id,fact_key" });
               }
             }
           }
